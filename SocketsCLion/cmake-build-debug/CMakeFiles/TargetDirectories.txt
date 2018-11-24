@@ -1,0 +1,3 @@
+B:/Career/Projects/C++-Socket/SocketsCLion/cmake-build-debug/CMakeFiles/SocketsCLion.dir
+B:/Career/Projects/C++-Socket/SocketsCLion/cmake-build-debug/CMakeFiles/edit_cache.dir
+B:/Career/Projects/C++-Socket/SocketsCLion/cmake-build-debug/CMakeFiles/rebuild_cache.dir
