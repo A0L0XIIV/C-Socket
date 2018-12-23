@@ -1,4 +1,0 @@
-ToolSet: 15.0@B:\Visual Studio\2017\Community
-Options: 
-
-Options:
