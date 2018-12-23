@@ -1,6 +1,0 @@
-﻿  Client.cpp
-Server.obj : error LNK2005: _main zaten Client.obj üzerinde tanımlandı
-Server.obj : error LNK2005: "struct addrinfo * result" (?result@@3PAUaddrinfo@@A) zaten Client.obj üzerinde tanımlandı
-Server.obj : error LNK2005: "struct addrinfo * ptr" (?ptr@@3PAUaddrinfo@@A) zaten Client.obj üzerinde tanımlandı
-Server.obj : error LNK2005: "struct addrinfo hints" (?hints@@3Uaddrinfo@@A) zaten Client.obj üzerinde tanımlandı
-B:\Career\Projects\C++Socket\Sockets\Debug\Sockets.exe : fatal error LNK1169: Bir veya daha fazla birden çok kez tanımlanmış sembol bulundu
