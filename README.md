@@ -1,13 +1,7 @@
 # C-Socket
-C++ Socket - Client&amp;Server codes
+C++ Socket - Client and Server codes
 
-******************
-*		 *
-*   Baran Kaya   *
-*		 *
-******************
-
-****************************************************************
+Baran Kaya
 
 - This is the C++ socket code.
 - It is coded for test&learn purposes.
