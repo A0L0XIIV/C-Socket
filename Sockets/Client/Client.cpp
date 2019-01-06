@@ -6,7 +6,7 @@
 * Local IP				  *
 **************************/
 
-#include "stdafx.h"
+//#include "stdafx.h"
 
 #include <iostream>
 #include <cstdlib>
