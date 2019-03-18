@@ -8,16 +8,21 @@
 
 //#include "stdafx.h"
 
+#define WIN32_LEAN_AND_MEAN
+
 #include <iostream>
 #include <cstdlib>
+#include <windows.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
 
 //WinSock Documentation
 //https://docs.microsoft.com/en-us/windows/desktop/winsock
 
-//The WSAStartup function is called to initiate use of WS2_32.dll.
-#pragma comment(lib, "Ws2_32.lib")
+// Need to link with Ws2_32.lib, Mswsock.lib, and Advapi32.lib
+#pragma comment (lib, "Ws2_32.lib")
+#pragma comment (lib, "Mswsock.lib")
+#pragma comment (lib, "AdvApi32.lib")
 
 //Port to run
 #define DEFAULT_PORT "27015"
@@ -37,6 +42,15 @@ int main(int argc, char *argv[])
 
 	// Result of the steps & for checking the errors.
 	int iResult;
+
+	// SOCKET object for the client to connect to server
+	SOCKET ConnectSocket = INVALID_SOCKET;
+
+	// Validate the parameters
+	/*if (argc != 2) {
+		cout << "usage: " << argv[0] << " server-name" << endl;
+		return 1;
+	}*/
 
 	// 0. Initialize Winsock
 	try {
@@ -68,35 +82,33 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	// SOCKET object for the client to connect to server
-	SOCKET ConnectSocket = INVALID_SOCKET;
+	// Attempt to connect to an address until one succeeds
+	for (ptr = result; ptr != NULL; ptr = ptr->ai_next) {
 
-	ptr = result;
+		// Create a SOCKET for connecting to server
+		ConnectSocket = socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol);
 
-	ConnectSocket = socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol);
+		if (ConnectSocket == INVALID_SOCKET) {
+			cout << "Connect Socket\t\tFAILED: " << WSAGetLastError() << endl;
+			freeaddrinfo(result);
+			WSACleanup();
+			return 1;
+		}
+		else {
+			cout << "ListenSocket\t\t\tSUCCESS" << endl;
+		}
 
-	if (ConnectSocket == INVALID_SOCKET) {
-		cout << "Connect Socket\t\tFAILED: " << WSAGetLastError() << endl;
-		freeaddrinfo(result);
-		WSACleanup();
-		return 1;
-	}
-	else {
-		cout << "ListenSocket\t\t\tSUCCESS" << endl;
-	}
-
-
-
-	// 2. Connect to a socket
-
-	// Connect to server
-	iResult = connect(ConnectSocket, ptr->ai_addr, (int)ptr->ai_addrlen);
-	if (iResult == SOCKET_ERROR) {
-		closesocket(ConnectSocket);
-		ConnectSocket = INVALID_SOCKET;
-	}
-	else {
-		cout << "Server Connection\t\t\tSUCCESS" << endl;
+		// 2. Connect to server with socket
+		iResult = connect(ConnectSocket, ptr->ai_addr, (int)ptr->ai_addrlen);
+		if (iResult == SOCKET_ERROR) {
+			closesocket(ConnectSocket);
+			ConnectSocket = INVALID_SOCKET;
+			continue;
+		}
+		else {
+			cout << "Server Connection\t\tSUCCESS" << endl;
+			break;
+		}
 	}
 
 	// Should really try the next address returned by getaddrinfo
@@ -117,7 +129,6 @@ int main(int argc, char *argv[])
 	int recvbuflen = DEFAULT_BUFLEN;
 	char recvbuf[DEFAULT_BUFLEN];
 	char sendbuf[15] = "this is a test";
-	//char *sendbuf = "this is a test";
 
 	// Send an initial buffer
 	iResult = send(ConnectSocket, sendbuf, (int)strlen(sendbuf), 0);
@@ -131,7 +142,7 @@ int main(int argc, char *argv[])
 	cout << "Bytes Sent: " << iResult << endl;
 
 	// shutdown the connection for sending since no more data will be sent
-	// the client can still use the ConnectSocket for receiving data
+	// 4. the client can still use the ConnectSocket for receiving data
 	iResult = shutdown(ConnectSocket, SD_SEND);
 	if (iResult == SOCKET_ERROR) {
 		cout << "Send Shutdown\t\t\tFAILED: " << WSAGetLastError() << endl;
@@ -143,7 +154,7 @@ int main(int argc, char *argv[])
 		cout << "Send Shutdown\t\t\tSUCCESS" << endl;
 	}
 
-	// Receive data until the server closes the connection
+	// 5. Receive data until the server closes the connection
 	do {
 		iResult = recv(ConnectSocket, recvbuf, recvbuflen, 0);
 		if (iResult > 0)
@@ -167,7 +178,7 @@ int main(int argc, char *argv[])
 		cout << "Shutdown\t\t\t\tSUCCESS" << endl;
 	}
 
-	// cleanup
+	// 7. Cleanup
 	closesocket(ConnectSocket);
 	WSACleanup();
 

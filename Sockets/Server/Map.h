@@ -36,14 +36,14 @@ vector<vector<char>> Map::drawMap(char wall) {
 		cout << "Row or column cannot be zero" << endl;
 
 	//Generate the basic map
-	//4x4 map w/ * -> *  *
+	//4x4 map w/ '*' -> *  *
 	vector<char> edges(1, wall);
 	for (int i = 0; i < column - 2; i++)
 		edges.push_back(' ');
 	edges.push_back(wall);
 
 	//Push horizantalLine and edges into the map
-	//4x4 map w/ * -> ****
+	//4x4 map w/ '*' -> ****
 	map.push_back(vector<char> (column, wall));
 	for (int i = 0; i < column - 2; i++)
 		map.push_back(edges);
