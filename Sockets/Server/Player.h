@@ -9,7 +9,7 @@ private:
 	string name{ "Player" };
 	char symbol{ 'o' };
 public:
-	Player();
+	Player() = default;
 	Player(string Name, char sym) { name = Name; symbol = sym; };
 	string getName() { return name; };
 	char getSymbol() { return symbol; };
