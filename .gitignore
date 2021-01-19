@@ -53,3 +53,9 @@
 *.db-shm
 *.db-wal
 
+
+*.opendb
+
+Sockets/Client/Debug/
+
+Sockets/Server/Debug/
