@@ -1,7 +1,7 @@
 /*Baran Kaya*/
 
 /**************************
-* Basic socket program	  *
+* Basic Windows socket	  *
 * Server - Client		  *
 * Local IP				  *
 **************************/
@@ -128,18 +128,38 @@ int main(int argc, char *argv[])
 	// 3. Recieve&Send data
 	int recvbuflen = DEFAULT_BUFLEN;
 	char recvbuf[DEFAULT_BUFLEN];
-	char sendbuf[15] = "this is a test";
+	char sendbuf[DEFAULT_BUFLEN] = {};
+	//char* sendbuf = nullptr;
+	string input;
 
-	// Send an initial buffer
-	iResult = send(ConnectSocket, sendbuf, (int)strlen(sendbuf), 0);
-	if (iResult == SOCKET_ERROR) {
-		cout << "Send \t\t\t\t\tFAILED: " << WSAGetLastError() << endl;
-		closesocket(ConnectSocket);
-		WSACleanup();
-		return 1;
+	while (input != "0") {
+		cout << "Enter 0 for exiting. Message: ";
+		cin >> skipws >> input;
+		if (input == "0") break;
+		//memset(&(sendbuf[0]), 0, DEFAULT_BUFLEN);
+		strcpy_s(sendbuf, input.c_str());
+		//sendbuf = &input[0];
+
+		// Send an initial buffer
+		iResult = send(ConnectSocket, sendbuf, (int)strlen(sendbuf), 0);
+		if (iResult == SOCKET_ERROR) {
+			cout << "Send \t\t\t\t\tFAILED: " << WSAGetLastError() << endl;
+			closesocket(ConnectSocket);
+			WSACleanup();
+			return 1;
+		}
+		// Print sent bytes
+		cout << "Bytes Sent: " << iResult << endl;
+
+		// Recieve sent message back
+		iResult = recv(ConnectSocket, recvbuf, recvbuflen, 0);
+		if (iResult > 0) {
+			cout << "Bytes received: " << iResult << endl << "Recieved Message: ";
+			for (int i = 0; i < iResult; ++i)
+				cout << recvbuf[i];
+			cout << endl << flush;
+		}
 	}
-
-	cout << "Bytes Sent: " << iResult << endl;
 
 	// shutdown the connection for sending since no more data will be sent
 	// 4. the client can still use the ConnectSocket for receiving data
