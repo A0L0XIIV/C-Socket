@@ -1,18 +1,16 @@
-#include <iostream>
-#include <vector>
-#include <windows.h> // for sleep()
+#pragma once
 
-using namespace std;
+#include<string>
 
 class Player {
 private:
-	string name{ "Player" };
+	std::string name{ "Player" };
 	char symbol{ 'o' };
 public:
 	Player() = default;
-	Player(string Name, char sym) { name = Name; symbol = sym; };
-	string getName() { return name; };
+	Player(std::string Name, char sym) { name = Name; symbol = sym; };
+	std::string getName() { return name; };
 	char getSymbol() { return symbol; };
-	void setName(string Name) { name = Name; };
+	void setName(std::string Name) { name = Name; };
 	void setSymbol(char sym) { symbol = sym; };
 }; 
