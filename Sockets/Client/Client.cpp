@@ -245,7 +245,8 @@ void recieveDataFromServer(SOCKET ServerSocket) {
 		// Recieve messages
 		iResult = recv(ServerSocket, recvbuf, recvbuflen, 0);
 		if (iResult > 0) {
-			cout << iResult << " bytes received from" << ServerSocket << ", message: ";
+			//cout << iResult << " bytes received from " << ServerSocket << ", message: ";
+			cout << ServerSocket << ": ";
 			for (int i = 0; i < iResult; ++i) {
 				recvbuf[i] != '_' ? cout << recvbuf[i] : cout << ' ';
 			}
@@ -269,9 +270,9 @@ void sendDataToServer(SOCKET ServerSocket) {
 	char sendbuf[DEFAULT_BUFLEN] = {};
 
 	string input;
+	cout << "Enter 0 for exiting. Message: " << endl << flush;
 
 	while (input != "0") {
-		cout << "Enter 0 for exiting. Message: ";
 		//cin >> skipws >> input;
 		std::getline(std::cin, input);
 
@@ -282,6 +283,7 @@ void sendDataToServer(SOCKET ServerSocket) {
 			return ch == ' ' ? '_' : ch;
 		});
 
+		// String to char array
 		strcpy_s(sendbuf, input.c_str());
 
 		// Send an initial buffer
