@@ -15,6 +15,9 @@
 #include <windows.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
+#include <thread>		// Thread
+#include <algorithm>	// Transform space to underscore
+#include <string>		// Getline
 
 //WinSock Documentation
 //https://docs.microsoft.com/en-us/windows/desktop/winsock
@@ -35,6 +38,10 @@ using namespace std;
 struct addrinfo *result = NULL, 
 				*ptr = NULL, 
 				hints;
+
+// Recieve thread
+void recieveDataFromServer(SOCKET ServerSocket);
+void sendDataToServer(SOCKET ServerSocket);
 
 int main(int argc, char *argv[])
 {
@@ -130,7 +137,16 @@ int main(int argc, char *argv[])
 	char recvbuf[DEFAULT_BUFLEN];
 	char sendbuf[DEFAULT_BUFLEN] = {};
 	//char* sendbuf = nullptr;
-	string input;
+
+	// Create a new thread for reciving messages from the server
+	thread* first = new thread(recieveDataFromServer, ConnectSocket);
+	//first->detach();
+	thread* second = new thread(sendDataToServer, ConnectSocket);
+	//second->detach();
+	first->join();
+	//second->join();
+
+	/*string input;
 
 	while (input != "0") {
 		cout << "Enter 0 for exiting. Message: ";
@@ -179,14 +195,23 @@ int main(int argc, char *argv[])
 		iResult = recv(ConnectSocket, recvbuf, recvbuflen, 0);
 		if (iResult > 0)
 			cout << "Bytes received: " << iResult << endl;
-		else if (iResult == 0)
-			cout << "Connection closed" << endl;
+		else if (iResult == 0) {
+			cout << "Server closed!" << endl;
+		}
 		else
 			cout << "Recieve\t\t\t\tFAILED: " << WSAGetLastError() << endl;
 	} while (iResult > 0);
 
 
 	// 6. Disconnect the server-shutdown the connection
+	cout << "Connection closing..." << endl;
+	Sleep(1000);
+	cout << "3" << endl << flush;
+	Sleep(1000);
+	cout << "2" << endl << flush;
+	Sleep(1000);
+	cout << "1" << endl << flush;
+	Sleep(1000);
 	iResult = shutdown(ConnectSocket, SD_SEND);
 	if (iResult == SOCKET_ERROR) {
 		cout << "Shutdown\t\t\t\tFAILED: " << WSAGetLastError() << endl;
@@ -202,7 +227,112 @@ int main(int argc, char *argv[])
 	closesocket(ConnectSocket);
 	WSACleanup();
 
-
-	return 0;
+	return 0;*/
 }
 
+void recieveDataFromServer(SOCKET ServerSocket) {
+	// Result of the steps & for checking the errors.
+	int iResult;
+	// 3. Recieve&Send data
+	int recvbuflen = DEFAULT_BUFLEN;
+	char recvbuf[DEFAULT_BUFLEN];
+	char sendbuf[DEFAULT_BUFLEN] = {};
+
+	// 5. Receive data until the server closes the connection
+	do {
+		// Sleep 100ms
+		Sleep(100);
+		// Recieve messages
+		iResult = recv(ServerSocket, recvbuf, recvbuflen, 0);
+		if (iResult > 0) {
+			cout << iResult << " bytes received from" << ServerSocket << ", message: ";
+			for (int i = 0; i < iResult; ++i) {
+				recvbuf[i] != '_' ? cout << recvbuf[i] : cout << ' ';
+			}
+			cout << endl << flush;
+		}
+		else if (iResult == 0) {
+			cout << "Server closed!" << endl;
+		}
+		else
+			cout << "Recieve\t\t\t\tFAILED: " << WSAGetLastError() << endl;
+	} while (iResult > 0 && ServerSocket != INVALID_SOCKET);
+
+	return;
+}
+
+void sendDataToServer(SOCKET ServerSocket) {
+	// Result of the steps & for checking the errors.
+	int iResult;
+	// 3. Recieve&Send data
+	int recvbuflen = DEFAULT_BUFLEN;
+	char sendbuf[DEFAULT_BUFLEN] = {};
+
+	string input;
+
+	while (input != "0") {
+		cout << "Enter 0 for exiting. Message: ";
+		//cin >> skipws >> input;
+		std::getline(std::cin, input);
+
+		if (input == "0") break;
+
+		// Replace spaces with underscore
+		transform(input.begin(), input.end(), input.begin(), [](char ch) {
+			return ch == ' ' ? '_' : ch;
+		});
+
+		strcpy_s(sendbuf, input.c_str());
+
+		// Send an initial buffer
+		iResult = send(ServerSocket, sendbuf, (int)strlen(sendbuf), 0);
+		if (iResult == SOCKET_ERROR) {
+			cout << "Send \t\t\t\t\tFAILED: " << WSAGetLastError() << endl;
+			closesocket(ServerSocket);
+			WSACleanup();
+			return;
+		}
+		// Print sent bytes
+		cout << "Bytes Sent: " << iResult << endl;
+	}
+
+	// shutdown the connection for sending since no more data will be sent
+	// 4. the client can still use the ConnectSocket for receiving data
+	iResult = shutdown(ServerSocket, SD_SEND);
+	if (iResult == SOCKET_ERROR) {
+		cout << "Send Shutdown\t\t\tFAILED: " << WSAGetLastError() << endl;
+		closesocket(ServerSocket);
+		WSACleanup();
+		return;
+	}
+	else {
+		cout << "Send Shutdown\t\t\tSUCCESS" << endl;
+	}
+
+
+	// 6. Disconnect the server-shutdown the connection
+	cout << "Connection closing..." << endl;
+	Sleep(1000);
+	cout << "3" << endl << flush;
+	Sleep(1000);
+	cout << "2" << endl << flush;
+	Sleep(1000);
+	cout << "1" << endl << flush;
+	Sleep(1000);
+	iResult = shutdown(ServerSocket, SD_SEND);
+	if (iResult == SOCKET_ERROR) {
+		cout << "Shutdown\t\t\t\tFAILED: " << WSAGetLastError() << endl;
+		closesocket(ServerSocket);
+		WSACleanup();
+		return;
+	}
+	else {
+		cout << "Shutdown\t\t\t\tSUCCESS" << endl;
+	}
+
+	// 7. Cleanup
+	closesocket(ServerSocket);
+	WSACleanup();
+
+	return;
+}

@@ -24,9 +24,9 @@ void WaitingRoom::PlayersList() {
 	cout << "Waiting Room" << endl << endl;
 
 	cout << "*------------------------------*" << endl;
-	for (int i = 0; i < clients.size(); i++) {
+	for (unsigned int i = 0; i < clients.size(); i++) {
 		cout << "|" << i << ". " << clients[i]->getName();
-		for (int j = 0; j < clients[i]->getName().length(); j++)
+		for (unsigned int j = 0; j < clients[i]->getName().length(); j++)
 			cout << ' ';
 		cout << '|' << endl;
 	}
