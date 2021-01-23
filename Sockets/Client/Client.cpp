@@ -40,8 +40,8 @@ struct addrinfo *result = NULL,
 				hints;
 
 // Recieve and send threads
-void recieveDataFromServer(SOCKET ServerSocket);
-void sendDataToServer(SOCKET ServerSocket);
+void recieveDataFromServer(SOCKET ServerSocket, atomic<bool>& isSocketOpen);
+void sendDataToServer(SOCKET ServerSocket, atomic<bool>& isSocketOpen);
 
 int main(int argc, char *argv[]) {
 	// PLAYER SELECTION OPERATIONS
@@ -60,6 +60,8 @@ int main(int argc, char *argv[]) {
 		cin >> connectNowChar;
 		if (connectNowChar == "y" || connectNowChar == "Y")
 			connectNow = true;
+		else if (connectNowChar == "n" || connectNowChar == "N")
+			return 0;
 	}
 
 	// WINSOCK OPERATIONS
@@ -170,27 +172,28 @@ int main(int argc, char *argv[]) {
 		cout << "Set Player Name\t\t\tSUCCESS" << endl << flush;
 	}
 	else {
-		cout << "Set Player Name\t\'ttFAILED: " << recvbuf << endl;
+		cout << "Set Player Name\t\t\tFAILED: " << recvbuf << endl;
 		closesocket(ConnectSocket);
 		WSACleanup();
 		return 1;
 	}
 
-
+	// Atomic variables for checking socket's status
+	atomic<bool> isSocketOpen(true);
 	// Create a new thread for reciving messages from the server
-	thread* first = new thread(recieveDataFromServer, ConnectSocket);
+	thread* read = new thread(recieveDataFromServer, ConnectSocket, ref(isSocketOpen));
 	// Create a new thread for sending messages to the server
-	thread* second = new thread(sendDataToServer, ConnectSocket);
+	thread* write = new thread(sendDataToServer, ConnectSocket, ref(isSocketOpen));
 
-	//first->detach();
-	//second->detach();
-	first->join();
-	//second->join();
+	//read->detach();
+	write->detach();
+	read->join();
+	//write->join();
 
 	return 0;
 }
 
-void recieveDataFromServer(SOCKET ServerSocket) {
+void recieveDataFromServer(SOCKET ServerSocket, atomic<bool>& isSocketOpen) {
 	// Result of the steps & for checking the errors.
 	int iResult;
 	// 3. Recieve data
@@ -210,16 +213,20 @@ void recieveDataFromServer(SOCKET ServerSocket) {
 			cout << endl << flush;
 		}
 		else if (iResult == 0) {
-			cout << "Server closed!" << endl;
+			cout << "Connection closed!" << endl;
+		}
+		else if (!isSocketOpen) {
+			break;
 		}
 		else
-			cout << "Recieve\t\t\t\tFAILED: " << WSAGetLastError() << endl;
-	} while (iResult > 0 && ServerSocket != INVALID_SOCKET);
+			cout << "Recieve\t\t\tFAILED: " << WSAGetLastError() << endl;
+	} while (isSocketOpen && iResult > 0);
 
 	return;
 }
 
-void sendDataToServer(SOCKET ServerSocket) {
+
+void sendDataToServer(SOCKET ServerSocket, atomic<bool>& isSocketOpen) {
 	// Result of the steps & for checking the errors.
 	int iResult;
 	// 3. Send data
@@ -254,39 +261,30 @@ void sendDataToServer(SOCKET ServerSocket) {
 		cout << "Bytes Sent: " << iResult << endl;
 	}
 
-	// shutdown the connection for sending since no more data will be sent
-	// 4. the client can still use the ConnectSocket for receiving data
-	iResult = shutdown(ServerSocket, SD_SEND);
-	if (iResult == SOCKET_ERROR) {
-		cout << "Send Shutdown\t\t\tFAILED: " << WSAGetLastError() << endl;
-		closesocket(ServerSocket);
-		WSACleanup();
-		return;
-	}
-	else {
-		cout << "Send Shutdown\t\t\tSUCCESS" << endl;
-	}
-
-
 	// 6. Disconnect the server-shutdown the connection
-	cout << "Connection closing..." << endl;
+	cout << "Connection closing..." << flush;
 	Sleep(1000);
-	cout << "3" << endl << flush;
+	cout << "\b\b\b in 3" << flush;
 	Sleep(1000);
-	cout << "2" << endl << flush;
+	cout << "\b2" << flush;
 	Sleep(1000);
-	cout << "1" << endl << flush;
+	cout << "\b1" << flush;
 	Sleep(1000);
+	cout << "\b0" << endl << flush;
+
 	iResult = shutdown(ServerSocket, SD_SEND);
 	if (iResult == SOCKET_ERROR) {
-		cout << "Shutdown\t\t\t\tFAILED: " << WSAGetLastError() << endl;
+		cout << "Shutdown\t\t\tFAILED: " << WSAGetLastError() << endl;
 		closesocket(ServerSocket);
 		WSACleanup();
 		return;
 	}
 	else {
-		cout << "Shutdown\t\t\t\tSUCCESS" << endl;
+		cout << "Shutdown\t\t\tSUCCESS" << endl;
 	}
+
+	// Update socket status so that read thread can finish
+	isSocketOpen = false;
 
 	// 7. Cleanup
 	closesocket(ServerSocket);

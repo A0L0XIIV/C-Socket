@@ -17,8 +17,8 @@
 #include <windows.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
-#include <thread> // For threads
-#include <list> // Linked list
+#include <thread>	// For threads
+#include <list>		// Linked list
 
 #include "Map.h"
 #include "WaitingRoom.h"
@@ -35,8 +35,8 @@ using namespace std;
 struct addrinfo *result = NULL;
 struct addrinfo hints;
 
-void ClientAccept(const SOCKET& ListenSocket, list<pair<SOCKET, Player*>>& ClientSocketsList);
-void ClientSession(const SOCKET& ListenSocket, list<pair<SOCKET, Player*>>& ClientSocketsList, SOCKET ClientSocket, char * recvbuf);
+void ClientAccept(const SOCKET& ListenSocket, list<pair<SOCKET, Player*>>& ClientSocketsList, static char* st_recvbuf);
+void ClientHandle(SOCKET ClientSocket, list<pair<SOCKET, Player*>>& ClientSocketsList, static char * st_recvbuf);
 
 // Compares Client Socket Linked List's first pair (SOCKET) to given SOCKET
 struct socketPairCompare {
@@ -70,9 +70,8 @@ int main()
 	list<pair<SOCKET, Player*>> ClientSocketsList;
 
 	// Recieve variables
-	char recvbuf[DEFAULT_BUFLEN] = {};
+	static char st_recvbuf[DEFAULT_BUFLEN] = {};
 	int iSendResult = 0;
-	int recvbuflen = DEFAULT_BUFLEN;
 	
 	// 0. Initialize Winsock
 	try {
@@ -138,7 +137,7 @@ int main()
 	// 3. Listen on socket
 	iResult = listen(ListenSocket, SOMAXCONN);
 	if (iResult == SOCKET_ERROR) {
-		cout << "Listen\t\t\t\tSUCCESS: " << WSAGetLastError() << endl;
+		cout << "Listen\t\t\t\tFAILED: " << WSAGetLastError() << endl;
 		closesocket(ListenSocket);
 		WSACleanup();
 		return 1;
@@ -147,69 +146,56 @@ int main()
 		cout << "Listen\t\t\t\tSUCCESS" << endl;
 	}
 
-	/*// Accept new clients in the infinite loop
-	while (1) {
-		NewClientSocket = accept(ListenSocket, NULL, NULL);
-		// New client arrived
-		if (NewClientSocket != INVALID_SOCKET && clientCounter <= MAX_CLIENT) {
-			// Create and execute the a new thread for each client
-			thread* clientHandleThread = new thread(ClientSession, std::ref(ListenSocket), std::ref(ClientSocketsList), NewClientSocket, recvbuf);
-			// Without detach, recv function doesn't work in threads
-			clientHandleThread->detach();
-			// Increase counter
-			++clientCounter;
-		}
-		// No new clients or max number of clients: do nothing
-		else {
-			// Update client counter, some clients might left the server
-			clientCounter = ClientSocketsList.size();
-			// Sleep for a second
-			Sleep(1000);
-			// Try again
-			continue;
-		}
-	}*/
-	// Create and execute the a new thread for each client
-	thread clientAcceptThread(ClientAccept, std::ref(ListenSocket), std::ref(ClientSocketsList));
+
+	// 4: 5, 6. Create and execute the a new thread for each client
+	thread clientAcceptThread(ClientAccept, std::ref(ListenSocket), std::ref(ClientSocketsList), st_recvbuf);
 	// Without detach, recv function doesn't work in threads
 	clientAcceptThread.detach();
+
 	string input;
-	while (input != "esc") {
+	while (input != "0") {
 		getline(std::cin, input);
 	};
-	
-	// 6. Disconnect the server-shutdown the connection
-	iResult = shutdown(NewClientSocket, SD_SEND);
-	if (iResult == SOCKET_ERROR) {
-		cout << "Shutdown\t\t\tFAILED" << WSAGetLastError() << endl;
-		closesocket(NewClientSocket);
-		WSACleanup();
-		return 1;
-	}
-	else {
-		cout << "Shutdown\t\t\tSUCCESS" << endl;
-	}
 
+	// Send shutdown to all clients and close all sockets
+	for (pair<SOCKET, Player*> client : ClientSocketsList) {
+		// 6. Disconnect the server-shutdown the connection
+		iResult = shutdown(client.first, SD_SEND);
+		if (iResult == SOCKET_ERROR) {
+			cout << "Shutdown " << client.first << "\t\tFAILED" << WSAGetLastError() << endl;
+			closesocket(client.first);
+			WSACleanup();
+			return 1;
+		}
+		else {
+			cout << "Shutdown " << client.first << "\t\tSUCCESS" << endl;
+		}
+
+		// Close socket
+		closesocket(client.first);
+	}
 	// 7. Cleanup
-	closesocket(NewClientSocket);
 	WSACleanup();
 
     return 0;
 }
 
-
-void ClientAccept(const SOCKET& ListenSocket, list<pair<SOCKET, Player*>>& ClientSocketsList) {
+// Accept Clients thread function
+void ClientAccept(const SOCKET& ListenSocket, list<pair<SOCKET, Player*>>& ClientSocketsList, static char * st_recvbuf) {
 	SOCKET NewClientSocket = 0;
 	size_t clientCounter = 0;
 	const size_t MAX_CLIENT = 10;
+
+	sockaddr_in from;
+	int fromlen = sizeof(from);
+
 	// Accept new clients in the infinite loop
 	while (1) {
-		NewClientSocket = accept(ListenSocket, NULL, NULL);
-		cout << "NEW CLI SOC: " << NewClientSocket << endl;
+		NewClientSocket = accept(ListenSocket, (struct sockaddr*)&from, &fromlen);
 		// New client arrived
 		if (NewClientSocket != INVALID_SOCKET && clientCounter <= MAX_CLIENT) {
 			// Create and execute the a new thread for each client
-			thread clientHandleThread (ClientSession, std::ref(ListenSocket), std::ref(ClientSocketsList), NewClientSocket, nullptr);
+			thread clientHandleThread (ClientHandle, NewClientSocket, std::ref(ClientSocketsList), st_recvbuf);
 			// Without detach, recv function doesn't work in threads
 			clientHandleThread.detach();
 			// Increase counter
@@ -220,15 +206,28 @@ void ClientAccept(const SOCKET& ListenSocket, list<pair<SOCKET, Player*>>& Clien
 			// Update client counter, some clients might left the server
 			clientCounter = ClientSocketsList.size();
 			// Sleep for a second
-			Sleep(1000);
+			Sleep(250);
+			cout << "\rWaiting for new clients\t\t" << flush;
+			cout << "\b\\" << flush;
+			Sleep(250);
+			cout << "\rWaiting for new clients.\t" << flush;
+			cout << "\b|" << flush;
+			Sleep(250);
+			cout << "\rWaiting for new clients..\t" << flush;
+			cout << "\b/" << flush;
+			Sleep(250);
+			cout << "\rWaiting for new clients...\t" << flush;
+			cout << "\b-" << flush;
 			// Try again
 			continue;
 		}
 	}
+	return;
 }
 
-// Individual Client Handle Thread Function
-void ClientSession(const SOCKET& ListenSocket, list<pair<SOCKET, Player*>>& ClientSocketsList, SOCKET ClientSocket, char* recvbuf2) {
+
+// Individual Client Handle thread function
+void ClientHandle(SOCKET ClientSocket, list<pair<SOCKET, Player*>>& ClientSocketsList, static char* st_recvbuf) {
 	const size_t DEFAULT_BUFLEN = 512;
 	// Recieve variables
 	int iRecvResult = 0;
@@ -237,13 +236,14 @@ void ClientSession(const SOCKET& ListenSocket, list<pair<SOCKET, Player*>>& Clie
 	int iSendResult = 0;
 	char recvbuf[DEFAULT_BUFLEN] = {};
 	// Create a new player object
-	Player* clientPlayer = new Player("S_" + to_string(ClientSocket), 'O');
+	string playerName = "S_" + to_string(ClientSocket);
+	Player* clientPlayer = new Player(playerName, 'O');
 	
 
 	// 4. Accept connection - Accept a client socket
 	if (ClientSocket == INVALID_SOCKET) {
 		cout << "Accept Client " << ClientSocket << "\t\tFAILED" << WSAGetLastError() << endl;
-		closesocket(ListenSocket);
+		closesocket(ClientSocket);
 		WSACleanup();
 		return;
 	}
@@ -264,7 +264,7 @@ void ClientSession(const SOCKET& ListenSocket, list<pair<SOCKET, Player*>>& Clie
 		// Message recieved from the client
 		if (iRecvResult > 0) {
 			// Print message to server console
-			cout << iRecvResult << " bytes received from (" << ClientSocket << ") - " << clientPlayer->getName() << ", message: ";
+			cout << iRecvResult << " bytes received from (" << ClientSocket << ") - " << playerName << ", message: ";
 			for (int i = 0; i < iRecvResult; ++i)
 				cout << recvbuf[i];
 			cout << endl << flush;
@@ -301,12 +301,14 @@ void ClientSession(const SOCKET& ListenSocket, list<pair<SOCKET, Player*>>& Clie
 				strcpy_s(sendbuf, setPlayerSetMsg.c_str());
 				// Send response message to client
 				send(ClientSocket, sendbuf, iRecvResult, 0);
+				// Update the local nama variable
+				playerName = clientPlayer->getName();
 			}
 
 			// Normal message
 			else {
 				// Add client/player name in front of the message
-				string msgWithName = clientPlayer->getName() + ": " + string(recvbuf);
+				string msgWithName = playerName + ": " + string(recvbuf);
 				// String to char array
 				strcpy_s(sendbuf, msgWithName.c_str());
 
@@ -346,28 +348,14 @@ void ClientSession(const SOCKET& ListenSocket, list<pair<SOCKET, Player*>>& Clie
 		else {
 			// Cleint left
 			if (iRecvResult == 0) {
-				cout << "Player " << ClientSocket << " stopped the connection." << endl << flush;
+				cout << "Player (" << ClientSocket << ") - " << playerName << " stopped the connection." << endl << flush;
 			}
 			// Recieve failed
 			else {
-				cout << "Recieve from " << ClientSocket << " failed: " << WSAGetLastError() << endl;
+				cout << "Recieve from (" << ClientSocket << ") - " << playerName << " failed: " << WSAGetLastError() << endl;
 			}
 
-			// Left the server message
-			string leftMessage = "Player_" + to_string(ClientSocket) + "_has_left_the_server.";
-			// String to char array
-			strcpy_s(sendbuf, leftMessage.c_str());
-			// Print on server
-			cout << leftMessage << endl;
-			// Echo the left player to all clients
-			for (pair<SOCKET, Player*> otherClient : ClientSocketsList)
-				send(otherClient.first, sendbuf, leftMessage.length(), 0);
-
-			// Close socket to client and clean up
-			closesocket(ClientSocket);
-			WSACleanup();
-
-			// Find the socket inside the vector
+			// Find the socket inside the linked-list
 			auto toErease = std::find_if(ClientSocketsList.begin(), ClientSocketsList.end(), socketPairCompare(ClientSocket));
 			// And then erase if found
 			if (toErease != ClientSocketsList.end()) {
@@ -376,9 +364,23 @@ void ClientSession(const SOCKET& ListenSocket, list<pair<SOCKET, Player*>>& Clie
 			}
 			// Print number of players
 			cout << "Current number of players: " << ClientSocketsList.size() << endl;
+
+			// Generate a left the server message
+			string leftMessage = "Player_" + playerName + "_has_left_the_server.";
+			// String to char array
+			strcpy_s(sendbuf, leftMessage.c_str());
+			// Echo the left player to all clients
+			for (pair<SOCKET, Player*> otherClient : ClientSocketsList)
+				send(otherClient.first, sendbuf, leftMessage.length(), 0);
 			
-			// Kill the thread
-			return;
+			// End the loop
+			break;
 		}
 	} while (iRecvResult > 0);
+
+
+	// 7. Close socket and Cleanup
+	closesocket(ClientSocket);
+	WSACleanup();
+	return;
 }
