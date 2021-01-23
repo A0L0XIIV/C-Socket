@@ -39,12 +39,30 @@ struct addrinfo *result = NULL,
 				*ptr = NULL, 
 				hints;
 
-// Recieve thread
+// Recieve and send threads
 void recieveDataFromServer(SOCKET ServerSocket);
 void sendDataToServer(SOCKET ServerSocket);
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
+	// PLAYER SELECTION OPERATIONS
+	string name = "";
+	string symbol = "";
+	string connectNowChar = "";
+	bool connectNow = false;
+
+	cout << "Welcome to the X." << endl;
+	cout << "Please enter your name: ";
+	getline(std::cin, name);
+	cout << "Please enter a character for your player (Ex: O, X): ";
+	getline(std::cin, symbol);
+	while (!connectNow) {
+		cout << "Do you want to connect to the server now? (y/n): ";
+		cin >> connectNowChar;
+		if (connectNowChar == "y" || connectNowChar == "Y")
+			connectNow = true;
+	}
+
+	// WINSOCK OPERATIONS
 	WSADATA wsaData;
 
 	// Result of the steps & for checking the errors.
@@ -53,11 +71,6 @@ int main(int argc, char *argv[])
 	// SOCKET object for the client to connect to server
 	SOCKET ConnectSocket = INVALID_SOCKET;
 
-	// Validate the parameters
-	/*if (argc != 2) {
-		cout << "usage: " << argv[0] << " server-name" << endl;
-		return 1;
-	}*/
 
 	// 0. Initialize Winsock
 	try {
@@ -132,121 +145,65 @@ int main(int argc, char *argv[])
 	}
 
 
-	// 3. Recieve&Send data
-	int recvbuflen = DEFAULT_BUFLEN;
-	char recvbuf[DEFAULT_BUFLEN];
+	// 3. Recieve & Send data
+	char recvbuf[DEFAULT_BUFLEN] = {};
 	char sendbuf[DEFAULT_BUFLEN] = {};
-	//char* sendbuf = nullptr;
+
+	// Set player name
+	string setPlayerName = "!PlayerName=" + name + "!PlayerSymbol=" + symbol;
+	// String to char array
+	strcpy_s(sendbuf, setPlayerName.c_str());
+	// Send an set player name buffer
+	iResult = send(ConnectSocket, sendbuf, (int)strlen(sendbuf), 0);
+	if (iResult == SOCKET_ERROR) {
+		cout << "Set Player Name\t\t\tFAILED: " << WSAGetLastError() << endl;
+		closesocket(ConnectSocket);
+		WSACleanup();
+		return 1;
+	}
+
+	// Check if the palyer name set was succesfull
+	string checkPlayerSetMsg = "!PlayerSetSuccess";
+	// Recieve set player success message from the server
+	iResult = recv(ConnectSocket, recvbuf, DEFAULT_BUFLEN, 0);
+	if (iResult > 0 && recvbuf == checkPlayerSetMsg) {
+		cout << "Set Player Name\t\t\tSUCCESS" << endl << flush;
+	}
+	else {
+		cout << "Set Player Name\t\'ttFAILED: " << recvbuf << endl;
+		closesocket(ConnectSocket);
+		WSACleanup();
+		return 1;
+	}
+
 
 	// Create a new thread for reciving messages from the server
 	thread* first = new thread(recieveDataFromServer, ConnectSocket);
-	//first->detach();
+	// Create a new thread for sending messages to the server
 	thread* second = new thread(sendDataToServer, ConnectSocket);
+
+	//first->detach();
 	//second->detach();
 	first->join();
 	//second->join();
 
-	/*string input;
-
-	while (input != "0") {
-		cout << "Enter 0 for exiting. Message: ";
-		cin >> skipws >> input;
-		if (input == "0") break;
-		//memset(&(sendbuf[0]), 0, DEFAULT_BUFLEN);
-		strcpy_s(sendbuf, input.c_str());
-		//sendbuf = &input[0];
-
-		// Send an initial buffer
-		iResult = send(ConnectSocket, sendbuf, (int)strlen(sendbuf), 0);
-		if (iResult == SOCKET_ERROR) {
-			cout << "Send \t\t\t\t\tFAILED: " << WSAGetLastError() << endl;
-			closesocket(ConnectSocket);
-			WSACleanup();
-			return 1;
-		}
-		// Print sent bytes
-		cout << "Bytes Sent: " << iResult << endl;
-
-		// Recieve sent message back
-		iResult = recv(ConnectSocket, recvbuf, recvbuflen, 0);
-		if (iResult > 0) {
-			cout << "Bytes received: " << iResult << endl << "Recieved Message: ";
-			for (int i = 0; i < iResult; ++i)
-				cout << recvbuf[i];
-			cout << endl << flush;
-		}
-	}
-
-	// shutdown the connection for sending since no more data will be sent
-	// 4. the client can still use the ConnectSocket for receiving data
-	iResult = shutdown(ConnectSocket, SD_SEND);
-	if (iResult == SOCKET_ERROR) {
-		cout << "Send Shutdown\t\t\tFAILED: " << WSAGetLastError() << endl;
-		closesocket(ConnectSocket);
-		WSACleanup();
-		return 1;
-	}
-	else {
-		cout << "Send Shutdown\t\t\tSUCCESS" << endl;
-	}
-
-	// 5. Receive data until the server closes the connection
-	do {
-		iResult = recv(ConnectSocket, recvbuf, recvbuflen, 0);
-		if (iResult > 0)
-			cout << "Bytes received: " << iResult << endl;
-		else if (iResult == 0) {
-			cout << "Server closed!" << endl;
-		}
-		else
-			cout << "Recieve\t\t\t\tFAILED: " << WSAGetLastError() << endl;
-	} while (iResult > 0);
-
-
-	// 6. Disconnect the server-shutdown the connection
-	cout << "Connection closing..." << endl;
-	Sleep(1000);
-	cout << "3" << endl << flush;
-	Sleep(1000);
-	cout << "2" << endl << flush;
-	Sleep(1000);
-	cout << "1" << endl << flush;
-	Sleep(1000);
-	iResult = shutdown(ConnectSocket, SD_SEND);
-	if (iResult == SOCKET_ERROR) {
-		cout << "Shutdown\t\t\t\tFAILED: " << WSAGetLastError() << endl;
-		closesocket(ConnectSocket);
-		WSACleanup();
-		return 1;
-	}
-	else {
-		cout << "Shutdown\t\t\t\tSUCCESS" << endl;
-	}
-
-	// 7. Cleanup
-	closesocket(ConnectSocket);
-	WSACleanup();
-
-	return 0;*/
+	return 0;
 }
 
 void recieveDataFromServer(SOCKET ServerSocket) {
 	// Result of the steps & for checking the errors.
 	int iResult;
-	// 3. Recieve&Send data
-	int recvbuflen = DEFAULT_BUFLEN;
-	char recvbuf[DEFAULT_BUFLEN];
-	char sendbuf[DEFAULT_BUFLEN] = {};
+	// 3. Recieve data
+	char recvbuf[DEFAULT_BUFLEN] = {};
 
 	// 5. Receive data until the server closes the connection
 	do {
 		// Sleep 100ms
 		Sleep(100);
 		// Recieve messages
-		iResult = recv(ServerSocket, recvbuf, recvbuflen, 0);
+		iResult = recv(ServerSocket, recvbuf, DEFAULT_BUFLEN, 0);
 		if (iResult > 0) {
 			//cout << iResult << " bytes received from " << ServerSocket << ", message: ";
-			cout << ServerSocket << ": ";
 			for (int i = 0; i < iResult; ++i) {
 				recvbuf[i] != '_' ? cout << recvbuf[i] : cout << ' ';
 			}
@@ -265,12 +222,11 @@ void recieveDataFromServer(SOCKET ServerSocket) {
 void sendDataToServer(SOCKET ServerSocket) {
 	// Result of the steps & for checking the errors.
 	int iResult;
-	// 3. Recieve&Send data
-	int recvbuflen = DEFAULT_BUFLEN;
+	// 3. Send data
 	char sendbuf[DEFAULT_BUFLEN] = {};
 
 	string input;
-	cout << "Enter 0 for exiting. Message: " << endl << flush;
+	cout << "Enter 0 for exiting. Enter your message: " << endl << flush;
 
 	while (input != "0") {
 		//cin >> skipws >> input;
@@ -289,7 +245,7 @@ void sendDataToServer(SOCKET ServerSocket) {
 		// Send an initial buffer
 		iResult = send(ServerSocket, sendbuf, (int)strlen(sendbuf), 0);
 		if (iResult == SOCKET_ERROR) {
-			cout << "Send \t\t\t\t\tFAILED: " << WSAGetLastError() << endl;
+			cout << "Send\t\t\t\t\tFAILED: " << WSAGetLastError() << endl;
 			closesocket(ServerSocket);
 			WSACleanup();
 			return;
